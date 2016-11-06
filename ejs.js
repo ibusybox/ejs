@@ -55,6 +55,14 @@ EJS = function( options ){
 		}
 		this.name = options.element.id
 		this.type = '['
+		var template = new EJS.Compiler(this.text, this.type);
+
+		template.compile(options, this.name);
+
+		
+		EJS.update(this.name, this);
+		this.template = template;
+
 	}else if(options.url){
         options.url = EJS.endExt(options.url, this.extMatch);
 		this.name = this.name ? this.name : options.url;
@@ -63,22 +71,8 @@ EJS = function( options ){
 		var template = EJS.get(this.name /*url*/, this.cache);
 		if (template) return template;
 	    if (template == EJS.INVALID_PATH) return null;
-        try{
-            this.text = EJS.request( url+(this.cache ? '' : '?'+Math.random() ));
-        }catch(e){}
-
-		if(this.text == null){
-            throw( {type: 'EJS', message: 'There is no template at '+url}  );
-		}
 		//this.name = url;
 	}
-	var template = new EJS.Compiler(this.text, this.type);
-
-	template.compile(options, this.name);
-
-	
-	EJS.update(this.name, this);
-	this.template = template;
 };
 /* @Prototype*/
 EJS.prototype = {
@@ -126,12 +120,37 @@ EJS.prototype = {
      * @param {Object} options
      */
 	set_options : function(options){
+		//save options for later use
+		this.options = options		
         this.type = options.type || EJS.type;
 		this.cache = options.cache != null ? options.cache : EJS.cache;
 		this.text = options.text || null;
 		this.name =  options.name || null;
 		this.ext = options.ext || EJS.ext;
 		this.extMatch = new RegExp(this.ext.replace(/\./, '\.'));
+	},
+	/**
+	* Update element by data async
+	* @param {string} element, element id which update
+	* @params {JSON} data, data used to render
+	*/
+	ajax_update : function(element, data){
+		var params = {};
+		params.url = this.name + (this.cache ? '' : '?'+Math.random() );
+		var ejs = this;
+		params.onComplete = function(response){
+			ejs.text = response.responseText;
+			if(ejs.text == null){
+	            throw( {type: 'EJS', message: 'There is no template at '+params.url}  );
+			}
+			var template = new EJS.Compiler(ejs.text, ejs.type);
+			template.compile(ejs.options, ejs.name);
+			EJS.update(ejs.name, ejs);
+			ejs.template = template;
+
+			ejs.update(element, data);
+		};
+		EJS.ajax_request(params);
 	}
 };
 EJS.endExt = function(path, match){
